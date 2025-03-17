@@ -55,6 +55,8 @@ if one is set.  Otherwise it prints the genesis from the datadir.`,
 		Usage:     "Dump a specific block from storage",
 		ArgsUsage: "[? <blockHash> | <blockNum>]",
 		Flags: slices.Concat([]cli.Flag{
+			utils.GCModeFlag,
+			utils.CryptoKZGFlag,
 			utils.CacheFlag,
 			utils.IterativeOutputFlag,
 			utils.ExcludeCodeFlag,

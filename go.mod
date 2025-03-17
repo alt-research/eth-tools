@@ -1,8 +1,8 @@
 module github.com/fyInALT/eth-tools
 
-go 1.23.4
+go 1.22.0
 
-toolchain go1.23.7
+toolchain go1.22.7
 
 replace github.com/ethereum/go-ethereum => github.com/ethereum-optimism/op-geth v1.101500.1-rc.1
 
