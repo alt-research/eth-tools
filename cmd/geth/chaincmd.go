@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strconv"
@@ -35,6 +36,14 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
+)
+
+var (
+	JSONFileFlag = &cli.StringFlag{
+		Name:  "file",
+		Usage: `File to store the dump json`,
+		Value: "./dump.json",
+	}
 )
 
 var (
@@ -55,6 +64,7 @@ if one is set.  Otherwise it prints the genesis from the datadir.`,
 		Usage:     "Dump a specific block from storage",
 		ArgsUsage: "[? <blockHash> | <blockNum>]",
 		Flags: slices.Concat([]cli.Flag{
+			JSONFileFlag,
 			utils.GCModeFlag,
 			utils.CryptoKZGFlag,
 			utils.CacheFlag,
@@ -165,6 +175,26 @@ func parseDumpConfig(ctx *cli.Context, db ethdb.Database) (*state.DumpConfig, co
 	return conf, header.Root, nil
 }
 
+// RawDump returns the state. If the processing is aborted e.g. due to options
+// reaching Max, the `Next` key is set on the returned Dump.
+func RawDump(s *state.StateDB, opts *state.DumpConfig) state.Dump {
+	dump := &state.Dump{
+		Accounts: make(map[string]state.DumpAccount),
+	}
+	dump.Next = s.DumpToCollector(dump, opts)
+	return *dump
+}
+
+// Dump returns a JSON string representing the entire state as a single json-object
+func Dump(s *state.StateDB, opts *state.DumpConfig) []byte {
+	dump := RawDump(s, opts)
+	json, err := json.MarshalIndent(dump, "", "    ")
+	if err != nil {
+		log.Error("Error dumping state", "err", err)
+	}
+	return json
+}
+
 func dump(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
@@ -183,11 +213,28 @@ func dump(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	if ctx.Bool(utils.IterativeOutputFlag.Name) {
-		state.IterativeDump(conf, json.NewEncoder(os.Stdout))
-	} else {
-		fmt.Println(string(state.Dump(conf)))
+
+	content := string(Dump(state, conf))
+	fileName := JSONFileFlag.Value
+	if fileName == "" {
+		return fmt.Errorf("need use file")
 	}
+
+	if _, err := os.Stat(fileName); err == nil {
+		return fmt.Errorf("file %s had exist", fileName)
+	}
+
+	file, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = io.WriteString(file, content)
+	if err != nil {
+		return fmt.Errorf("Error writing to file: %w", err)
+	}
+
 	return nil
 }
 
