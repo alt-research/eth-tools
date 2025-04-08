@@ -19,6 +19,7 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -111,9 +112,74 @@ func (d iterativeDump) OnRoot(root common.Hash) {
 }
 
 func DebugForDetail(accountCount uint64, msg string, ctx ...interface{}) {
-	//if accountCount > 272000 && accountCount < 300000 {
-	log.Debug(msg, ctx...)
-	//}
+	return
+}
+
+// Iterator is a key-value trie iterator that traverses a Trie.
+type Iterator struct {
+	nodeIt trie.NodeIterator
+
+	Key   []byte // Current data key on which the iterator is positioned on
+	Value []byte // Current data value on which the iterator is positioned on
+	Err   error
+}
+
+// NewIterator creates a new key-value iterator from a node iterator.
+// Note that the value returned by the iterator is raw. If the content is encoded
+// (e.g. storage value is RLP-encoded), it's caller's duty to decode it.
+func NewIterator(it trie.NodeIterator) *Iterator {
+	return &Iterator{
+		nodeIt: it,
+	}
+}
+
+// Next moves the iterator forward one key-value entry.
+func (it *Iterator) Next() (bool, bool) {
+	nextCount := 0
+	rootPaths := make([][]byte, 0, 1024)
+	rootPaths = append(rootPaths, it.nodeIt.Path())
+
+	defer func() {
+		if nextCount >= 10000 {
+			log.Error("Paths Begin")
+			for idx, rootPath := range rootPaths {
+				log.Error("Paths", "idx", idx, "key", hexutil.Encode(rootPath))
+			}
+			log.Error("Paths End")
+		}
+	}()
+
+	for it.nodeIt.Next(true) {
+		nextCount += 1
+
+		if it.nodeIt.Leaf() {
+			it.Key = it.nodeIt.LeafKey()
+			it.Value = it.nodeIt.LeafBlob()
+			return true, false
+		}
+
+		if len(rootPaths) < 1024 {
+			rootPaths = append(rootPaths, it.nodeIt.Path())
+		}
+
+		if nextCount >= 10000 {
+			log.Error("cancel next storage iterator by too much counts")
+			it.Key = nil
+			it.Value = nil
+			it.Err = it.nodeIt.Error()
+			return false, true
+		}
+	}
+	it.Key = nil
+	it.Value = nil
+	it.Err = it.nodeIt.Error()
+	return false, false
+}
+
+// Prove generates the Merkle proof for the leaf node the iterator is currently
+// positioned on.
+func (it *Iterator) Prove() [][]byte {
+	return it.nodeIt.LeafProof()
 }
 
 // DumpToCollector iterates the state according to the given options and inserts
@@ -129,7 +195,7 @@ func (s *StateDB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []
 		start            = time.Now()
 		logged           = time.Now()
 	)
-	log.Info("Trie dumping started", "root", s.GetTrie().Hash())
+	log.Info("Trie dumping started", "root", s.GetTrie().Hash().Hex())
 	c.OnRoot(s.GetTrie().Hash())
 
 	trieIt, err := s.GetTrie().NodeIterator(conf.Start)
@@ -139,7 +205,7 @@ func (s *StateDB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []
 	}
 	it := trie.NewIterator(trieIt)
 	for it.Next() {
-		log.Debug("start process", "count", accounts, "missingPreimages", missingPreimages)
+		// log.Debug("start process", "count", accounts, "missingPreimages", missingPreimages)
 
 		isBreak := func() bool {
 			var data types.StateAccount
@@ -186,29 +252,12 @@ func (s *StateDB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []
 				DebugForDetail(accounts, "got code")
 			}
 			if !conf.SkipStorage {
-				account.Storage = make(map[common.Hash]string)
-				tr, err := obj.getTrie()
-				DebugForDetail(accounts, "got trie")
-				if err != nil {
-					log.Error("Failed to load storage trie", "err", err)
+				accountStorages, ok := s.fetchStoragesForAccount(obj, address, account)
+				if !ok {
 					return false
 				}
-				trieIt, err := tr.NodeIterator(nil)
-				if err != nil {
-					log.Error("Failed to create trie iterator", "err", err)
-					return false
-				}
-				DebugForDetail(accounts, "got trieIt")
-				storageIt := trie.NewIterator(trieIt)
-				for storageIt.Next() {
-					_, content, _, err := rlp.Split(storageIt.Value)
-					if err != nil {
-						log.Error("Failed to decode the value returned by iterator", "error", err)
-						return false
-					}
-					account.Storage[common.BytesToHash(s.GetTrie().GetKey(storageIt.Key))] = common.Bytes2Hex(content)
-				}
-				DebugForDetail(accounts, "got storageIt")
+
+				account.Storage = accountStorages
 			}
 			c.OnAccount(address, account)
 			DebugForDetail(accounts, "OnAccount finished")
@@ -229,7 +278,7 @@ func (s *StateDB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []
 			return false
 		}()
 
-		log.Debug("stop process", "count", accounts, "missingPreimages", missingPreimages)
+		// log.Debug("stop process", "count", accounts, "missingPreimages", missingPreimages)
 
 		if isBreak {
 			break
@@ -242,6 +291,62 @@ func (s *StateDB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []
 		"elapsed", common.PrettyDuration(time.Since(start)))
 
 	return nextKey
+}
+
+func (s *StateDB) fetchStoragesForAccount(obj *stateObject, address *common.Address, account DumpAccount) (map[common.Hash]string, bool) {
+	accountStorage := make(map[common.Hash]string)
+	tr, err := obj.getTrie()
+	if err != nil {
+		log.Error("Failed to load storage trie", "err", err)
+		return accountStorage, false
+	}
+	trieIt, err := tr.NodeIterator(nil)
+	if err != nil {
+		log.Error("Failed to create trie iterator", "err", err)
+		return accountStorage, false
+	}
+
+	storageIt := NewIterator(trieIt)
+
+	count := 0
+	for {
+		next, isCancel := storageIt.Next()
+		if !next {
+			break
+		}
+
+		if storageIt.Err != nil && !strings.Contains(storageIt.Err.Error(), "end of iteration") {
+			log.Error("storageIt Err", "err", err)
+		}
+
+		if isCancel {
+			log.Error(
+				"got next storage failed by too much next count",
+				"account", address,
+				"root", account.Root.String(),
+			)
+			break
+		}
+
+		if count >= 102400 {
+			log.Error(
+				"got storage failed by too much count",
+				"account", address,
+				"root", account.Root.String(),
+			)
+			break
+		}
+
+		count += 1
+		_, content, _, err := rlp.Split(storageIt.Value)
+		if err != nil {
+			log.Error("Failed to decode the value returned by iterator", "error", err)
+			return accountStorage, false
+		}
+		accountStorage[common.BytesToHash(s.GetTrie().GetKey(storageIt.Key))] = common.Bytes2Hex(content)
+	}
+
+	return accountStorage, true
 }
 
 // RawDump returns the state. If the processing is aborted e.g. due to options
