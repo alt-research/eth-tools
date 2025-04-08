@@ -35,7 +35,7 @@ const (
 func NewApp(usage string) *cli.App {
 	app := cli.NewApp()
 	app.EnableBashCompletion = true
-	app.Version = "0.0.1"
+	app.Version = "0.0.2"
 	app.Usage = usage
 	return app
 }
