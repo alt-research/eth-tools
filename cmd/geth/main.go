@@ -47,7 +47,7 @@ func init() {
 	//app.Action = geth
 	app.Commands = []*cli.Command{
 		dumpCommand,
-		dumpGenesisCommand,
+		dumpAddressCommand,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 

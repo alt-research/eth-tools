@@ -45,7 +45,19 @@ var (
 	JSONFileFlag = &cli.StringFlag{
 		Name:  "file",
 		Usage: `File to store the dump json`,
-		Value: "./dump.json",
+		Value: "./dump",
+	}
+
+	OnlyAddressesFlag = &cli.BoolFlag{
+		Name:  "onlyaddress",
+		Usage: `The dump data only contain address`,
+		Value: false,
+	}
+
+	WithZeroBalanceFlag = &cli.BoolFlag{
+		Name:  "withzerobalance",
+		Usage: `The dump data with contain the address with 0 balance`,
+		Value: false,
 	}
 )
 
@@ -67,6 +79,30 @@ if one is set.  Otherwise it prints the genesis from the datadir.`,
 		Usage:     "Dump a specific block from storage",
 		ArgsUsage: "[? <blockHash> | <blockNum>]",
 		Flags: slices.Concat([]cli.Flag{
+			JSONFileFlag,
+			utils.LogDebugFlag,
+			utils.GCModeFlag,
+			utils.CryptoKZGFlag,
+			utils.CacheFlag,
+			utils.IterativeOutputFlag,
+			utils.ExcludeCodeFlag,
+			utils.ExcludeStorageFlag,
+			utils.IncludeIncompletesFlag,
+			utils.StartKeyFlag,
+			utils.DumpLimitFlag,
+		}, utils.DatabaseFlags),
+		Description: `
+This command dumps out the state for a given block (or latest, if none provided).
+`,
+	}
+
+	dumpAddressCommand = &cli.Command{
+		Action: dumpAddress,
+		Name:   "dumpAddress",
+		Usage:  "Dump a specific block from storage",
+		Flags: slices.Concat([]cli.Flag{
+			WithZeroBalanceFlag,
+			OnlyAddressesFlag,
 			JSONFileFlag,
 			utils.LogDebugFlag,
 			utils.GCModeFlag,
@@ -166,7 +202,7 @@ func parseDumpConfig(ctx *cli.Context, db ethdb.Database) (*state.DumpConfig, co
 
 // Dump represents the full dump in a collected format, as one large map.
 type DumpData struct {
-	writer        *Writer
+	writer        DumpWriter
 	startTime     time.Time
 	lastTime      time.Time
 	per10000count int64
@@ -289,16 +325,18 @@ func dump(ctx *cli.Context) error {
 		return err
 	}
 
-	fileName := JSONFileFlag.Value
+	fileName := ctx.String(JSONFileFlag.Name)
 	if fileName == "" {
 		return fmt.Errorf("need use file")
 	}
+	dateString := time.Now().Format("2006-01-02-03-04-05")
+	fileNameFull := fmt.Sprintf("%s-%s.json", fileName, dateString)
 
-	if _, err := os.Stat(fileName); err == nil {
-		return fmt.Errorf("file %s had exist", fileName)
+	if _, err := os.Stat(fileNameFull); err == nil {
+		return fmt.Errorf("file %s had exist", fileNameFull)
 	}
 
-	file, err := os.Create(fileName)
+	file, err := os.Create(fileNameFull)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
