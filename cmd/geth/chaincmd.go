@@ -325,16 +325,18 @@ func dump(ctx *cli.Context) error {
 		return err
 	}
 
-	fileName := JSONFileFlag.Value
+	fileName := ctx.String(JSONFileFlag.Name)
 	if fileName == "" {
 		return fmt.Errorf("need use file")
 	}
+	dateString := time.Now().Format("2006-01-02-03-04-05")
+	fileNameFull := fmt.Sprintf("%s-%s.json", fileName, dateString)
 
-	if _, err := os.Stat(fileName); err == nil {
-		return fmt.Errorf("file %s had exist", fileName)
+	if _, err := os.Stat(fileNameFull); err == nil {
+		return fmt.Errorf("file %s had exist", fileNameFull)
 	}
 
-	file, err := os.Create(fileName)
+	file, err := os.Create(fileNameFull)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}

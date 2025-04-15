@@ -140,7 +140,7 @@ func (it *Iterator) Next() (bool, bool) {
 	rootPaths = append(rootPaths, it.nodeIt.Path())
 
 	defer func() {
-		if nextCount >= 10000 {
+		if nextCount >= 150000 {
 			log.Error("Paths Begin")
 			for idx, rootPath := range rootPaths {
 				log.Error("Paths", "idx", idx, "key", hexutil.Encode(rootPath))
@@ -162,7 +162,7 @@ func (it *Iterator) Next() (bool, bool) {
 			rootPaths = append(rootPaths, it.nodeIt.Path())
 		}
 
-		if nextCount >= 10000 {
+		if nextCount >= 150000 {
 			log.Error("cancel next storage iterator by too much counts")
 			it.Key = nil
 			it.Value = nil
