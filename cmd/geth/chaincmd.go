@@ -45,7 +45,13 @@ var (
 	JSONFileFlag = &cli.StringFlag{
 		Name:  "file",
 		Usage: `File to store the dump json`,
-		Value: "./dump.json",
+		Value: "./dump",
+	}
+
+	WithZeroBalanceFlag = &cli.BoolFlag{
+		Name:  "withzerobalance",
+		Usage: `The dump data with contain the address with 0 balance`,
+		Value: false,
 	}
 )
 
@@ -67,6 +73,29 @@ if one is set.  Otherwise it prints the genesis from the datadir.`,
 		Usage:     "Dump a specific block from storage",
 		ArgsUsage: "[? <blockHash> | <blockNum>]",
 		Flags: slices.Concat([]cli.Flag{
+			JSONFileFlag,
+			utils.LogDebugFlag,
+			utils.GCModeFlag,
+			utils.CryptoKZGFlag,
+			utils.CacheFlag,
+			utils.IterativeOutputFlag,
+			utils.ExcludeCodeFlag,
+			utils.ExcludeStorageFlag,
+			utils.IncludeIncompletesFlag,
+			utils.StartKeyFlag,
+			utils.DumpLimitFlag,
+		}, utils.DatabaseFlags),
+		Description: `
+This command dumps out the state for a given block (or latest, if none provided).
+`,
+	}
+
+	dumpAddressCommand = &cli.Command{
+		Action: dumpAddress,
+		Name:   "dumpAddress",
+		Usage:  "Dump a specific block from storage",
+		Flags: slices.Concat([]cli.Flag{
+			WithZeroBalanceFlag,
 			JSONFileFlag,
 			utils.LogDebugFlag,
 			utils.GCModeFlag,
@@ -166,7 +195,7 @@ func parseDumpConfig(ctx *cli.Context, db ethdb.Database) (*state.DumpConfig, co
 
 // Dump represents the full dump in a collected format, as one large map.
 type DumpData struct {
-	writer        *Writer
+	writer        DumpWriter
 	startTime     time.Time
 	lastTime      time.Time
 	per10000count int64
