@@ -48,6 +48,12 @@ var (
 		Value: "./dump",
 	}
 
+	OnlyAddressesFlag = &cli.BoolFlag{
+		Name:  "onlyaddress",
+		Usage: `The dump data only contain address`,
+		Value: false,
+	}
+
 	WithZeroBalanceFlag = &cli.BoolFlag{
 		Name:  "withzerobalance",
 		Usage: `The dump data with contain the address with 0 balance`,
@@ -96,6 +102,7 @@ This command dumps out the state for a given block (or latest, if none provided)
 		Usage:  "Dump a specific block from storage",
 		Flags: slices.Concat([]cli.Flag{
 			WithZeroBalanceFlag,
+			OnlyAddressesFlag,
 			JSONFileFlag,
 			utils.LogDebugFlag,
 			utils.GCModeFlag,

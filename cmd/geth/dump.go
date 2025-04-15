@@ -75,6 +75,7 @@ func (d *Writer) Wait() {
 
 type WriterAddress struct {
 	withZeroBalance bool
+	onlyAddress     bool
 	encoder         *json.Encoder
 	accounts        chan *state.DumpAccount
 	roots           chan common.Hash
@@ -97,18 +98,18 @@ func (d *WriterAddress) onRoot(root common.Hash) {
 
 // OnAccount implements DumpCollector interface
 func (d *WriterAddress) onAccount(account state.DumpAccount) {
-	log.Info("ss", account)
-
 	if account.Address == nil {
 		return
 	}
 
-	if account.Balance == "0" && !d.withZeroBalance {
-		log.Info("sss")
+	if d.onlyAddress {
+		d.encoder.Encode(*account.Address)
 		return
 	}
 
-	log.Info("ss", account)
+	if account.Balance == "0" && !d.withZeroBalance {
+		return
+	}
 
 	d.encoder.Encode(struct {
 		Address common.Address `json:"address"`

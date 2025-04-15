@@ -66,14 +66,15 @@ func dumpAddress(ctx *cli.Context) error {
 	}
 	defer file.Close()
 
-	return DumpAddress(ctx.Context, file, state, reader, conf, ctx.Bool(WithZeroBalanceFlag.Name))
+	return DumpAddress(ctx.Context, file, state, reader, conf, ctx.Bool(WithZeroBalanceFlag.Name), ctx.Bool(OnlyAddressesFlag.Name))
 }
 
 // Dump returns a JSON string representing the entire state as a single json-object
-func DumpAddress(ctx context.Context, file *os.File, s *state.StateDB, reader state.Reader, opts *state.DumpConfig, withZeroBalance bool) error {
+func DumpAddress(ctx context.Context, file *os.File, s *state.StateDB, reader state.Reader, opts *state.DumpConfig, withZeroBalance bool, onlyAddress bool) error {
 	log.Info("start write address", "flag", withZeroBalance)
 	writer := &WriterAddress{
 		withZeroBalance: withZeroBalance,
+		onlyAddress:     onlyAddress,
 		encoder:         json.NewEncoder(file),
 		accounts:        make(chan *state.DumpAccount, 4096),
 		roots:           make(chan common.Hash, 4096),
