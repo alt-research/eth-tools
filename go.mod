@@ -1,6 +1,6 @@
 module github.com/fyInALT/eth-tools
 
-go 1.23.3
+go 1.24.0
 
 replace github.com/ethereum/go-ethereum => github.com/ethereum-optimism/op-geth v1.101503.1
 
@@ -11,9 +11,9 @@ require (
 	github.com/holiman/uint256 v1.3.2
 	github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416
 	github.com/urfave/cli/v2 v2.27.6
-	golang.org/x/crypto v0.36.0
+	golang.org/x/crypto v0.45.0
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
-	golang.org/x/sync v0.12.0
+	golang.org/x/sync v0.18.0
 )
 
 require (
@@ -107,9 +107,9 @@ require (
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/net v0.37.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
